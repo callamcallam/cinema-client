@@ -1,6 +1,9 @@
 """Unified entry point for supported cinema providers."""
 
-from .exceptions import CinemaAPIError, CinemaError
+from importlib.metadata import PackageNotFoundError, version
+
+from .exceptions import *
+from .models import Booking, CinemaLocation, Film, Seat, Showtime, TicketType
 from .odeon import OdeonClient
 from .vue import VueClient
 
@@ -12,6 +15,8 @@ class Cinema:
     Vue = VueClient
 
 
-__all__ = ["Cinema", "CinemaAPIError", "CinemaError", "OdeonClient", "VueClient"]
-__version__ = "0.1.0"
-
+__all__ = ["Booking", "Cinema", "CinemaLocation", "Film", "OdeonClient", "Seat", "Showtime", "TicketType", "VueClient"]
+try:
+    __version__ = version("cinema-client")
+except PackageNotFoundError:
+    __version__ = "0.2.0"

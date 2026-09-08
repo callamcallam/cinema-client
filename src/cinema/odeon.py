@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -8,7 +9,9 @@ from typing import Any
 import requests
 
 from ._http import decode_response
+from .base import BaseClient, Capabilities, dictionaries, text
 from .exceptions import CinemaError
+from .models import Booking, CinemaLocation, Film, Seat, Showtime, TicketType
 
 HOME = "https://www.odeon.co.uk/"
 USER_AGENT = (
@@ -43,8 +46,13 @@ def _initial_data(text: str) -> dict[str, Any]:
     raise CinemaError("ODEON bootstrap data was incomplete")
 
 
-class OdeonClient:
+class OdeonClient(BaseClient):
     """Client for the public API used by the ODEON UK website."""
+
+    provider = "odeon"
+    display_name = "ODEON"
+    website = HOME
+    capabilities = Capabilities(seat_layout=True)
 
     def __init__(
         self,
@@ -55,8 +63,10 @@ class OdeonClient:
         auto_connect: bool = True,
     ):
         self.site_id, self.timeout = site_id, timeout
+        self._owns_session = session is None
         self.session = session or requests.Session()
         self.api_root: str | None = None
+        self._init_shared()
         if auto_connect:
             self.connect()
 
@@ -67,7 +77,8 @@ class OdeonClient:
         self.close()
 
     def close(self):
-        self.session.close()
+        if self._owns_session:
+            self.session.close()
 
     def connect(self):
         response = self.session.get(
@@ -96,13 +107,10 @@ class OdeonClient:
     def request(self, method: str, path: str, *, params=None, json_body=None):
         if not self.api_root:
             raise CinemaError("ODEON client is not connected")
-        response = self.session.request(
-            method,
-            f"{self.api_root}/{path.lstrip('/')}",
-            params=params,
-            json=json_body,
-            timeout=self.timeout,
-        )
+        for attempt in range(3):
+            response = self.session.request(method, f"{self.api_root}/{path.lstrip('/')}", params=params, json=json_body, timeout=self.timeout)
+            if method.upper() != "GET" or response.status_code not in {429, 502, 503, 504} or attempt == 2: break
+            time.sleep(0.25 * 2**attempt)
         return decode_response(response, method, path)
 
     def _site(self, site_id: str | None = None) -> str:
@@ -111,13 +119,14 @@ class OdeonClient:
             raise ValueError("site_id is required")
         return value
 
-    def cinemas(self):
-        return self.request("GET", "sites")
+    def cinemas(self, *, refresh: bool = False):
+        return self._cached(("raw-cinemas",), lambda: self.request("GET", "sites"), refresh)
 
     sites = cinemas
 
-    def films(self, site_id: str | None = None):
-        return self.request("GET", f"sites/{self._site(site_id)}/films")
+    def films(self, site_id: str | None = None, *, refresh: bool = False):
+        selected = self._site(site_id)
+        return self._cached(("raw-films", selected), lambda: self.request("GET", f"sites/{selected}/films"), refresh)
 
     def dates(self, film_id: str, site_id: str | None = None):
         return self.request("GET", "film-screening-dates", params=(("filmIds", film_id), ("siteIds", self._site(site_id))))
@@ -149,3 +158,64 @@ class OdeonClient:
 
     delete_order = cancel_order
 
+    def locations(self, *, refresh=False):
+        def load():
+            result = []
+            for item in dictionaries(self.cinemas(refresh=refresh), ("sites", "items", "value")):
+                identifier, name = str(item.get("id") or item.get("siteId") or ""), text(item.get("name"))
+                contact = item.get("contactDetails") or {}; address = contact.get("address") or {}
+                if identifier and name: result.append(CinemaLocation(raw=item, id=identifier, name=name, city=str(address.get("city") or ""), address=str(address.get("line1") or address.get("addressLine1") or ""), _client=self))
+            return result
+        return self._cached(("locations",), load, refresh)
+
+    def _high_films(self, cinema, *, refresh=False):
+        def load():
+            result = []
+            for item in dictionaries(self.films(cinema.id, refresh=refresh), ("films", "items", "value")):
+                identifier = str(item.get("id") or item.get("ID") or item.get("filmId") or item.get("ScheduledFilmId") or "")
+                title = text(item.get("title")) or str(item.get("Title") or item.get("name") or "")
+                if identifier and title: result.append(Film(raw=item, id=identifier, title=title, runtime=item.get("runtimeInMinutes"), rating=text(item.get("rating")), cinema=cinema, _client=self))
+            return result
+        return self._cached(("films", cinema.id), load, refresh)
+
+    def _high_dates(self, film, *, refresh=False):
+        payload = self._cached(("dates", film.cinema.id, film.id), lambda: self.dates(film.id, film.cinema.id), refresh)
+        values = payload.get("businessDates") or payload.get("dates") or []
+        return [str(x.get("businessDate") if isinstance(x, dict) else x) for x in values]
+
+    def _high_showtimes(self, film, date, *, refresh=False):
+        payload = self._cached(("showtimes", film.cinema.id, film.id, date), lambda: self.showtimes(film.id, date, film.cinema.id), refresh)
+        result = []
+        for item in dictionaries(payload, ("showtimes",)):
+            identifier = str(item.get("id") or item.get("ID") or ""); schedule = item.get("schedule") or {}
+            if identifier: result.append(Showtime(raw=item, id=identifier, datetime=str(schedule.get("startsAt") or item.get("startsAt") or item.get("Showtime") or ""), screen=str(item.get("screenId") or ""), layout_id=str(item.get("seatLayoutId") or ""), cinema=film.cinema, film=film, _client=self))
+        return sorted(result, key=lambda x: x.datetime)
+
+    def _high_seats(self, showing, *, refresh=True):
+        layout = self.seat_layout(showing.layout_id); availability = self.seats(showing.id)
+        statuses = {str(x.get("seatId")): str(x.get("status")) for x in availability.get("seatAvailabilities", [])}
+        result = []
+        for area in (layout.get("seatLayout") or {}).get("areas", []):
+            for row in area.get("rows", []):
+                for item in row.get("seats", []):
+                    pos = item.get("position") or {}; identifier = str(item.get("id") or "")
+                    label = f"{item.get('rowLabel') or row.get('label') or ''}{item.get('label') or ''}"
+                    if identifier: result.append(Seat(raw=item, id=identifier, label=label, row=str(item.get("rowLabel") or row.get("label") or ""), number=str(item.get("label") or ""), position=int(pos.get("columnNumber") or 0), available=statuses.get(identifier) == "Available", type=str(item.get("type") or "standard")))
+        return result
+
+    def _high_tickets(self, showing):
+        payload = self.tickets(showing.id); metadata = {str(x.get("id")): x for x in (payload.get("relatedData") or {}).get("ticketTypes", [])}
+        result = []
+        for item in payload.get("ticketPrices", []):
+            identifier = str(item.get("ticketTypeId") or ""); meta = metadata.get(identifier, {}); price = (item.get("price") or {}).get("valueIncludingTax")
+            if identifier: result.append(TicketType(raw=item, id=identifier, name=text(meta.get("description")) or text(meta.get("name")) or identifier, price=float(price) if price is not None else None))
+        return result
+
+    def _high_book(self, showing, seats, ticket, *, email=None):
+        selected = showing.seats(seats); ticket_type = showing.ticket(ticket); created = self.create_order(showing.cinema.id); order = created.get("order", created); order_id = str(order["id"])
+        try:
+            ids = [seat.id for seat in selected]; self.set_showtime(order_id, showing.id, ids); self.set_showtime(order_id, showing.id, ids, self.make_tickets(ticket_type.id, len(ids)))
+        except Exception:
+            try: self.cancel_order(order_id)
+            finally: raise
+        return Booking(raw=created, order_id=order_id, cinema=showing.cinema, film=showing.film, showtime=showing, seats=selected, tickets=[ticket_type]*len(selected), _client=self)

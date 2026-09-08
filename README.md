@@ -1,65 +1,71 @@
 # cinema-client
 
-One unofficial Python interface for ODEON UK and Vue UK.
+One friendly, unofficial Python SDK for ODEON UK and Vue UK.
 
 ```bash
 pip install cinema-client
 ```
 
+## 30-second start
+
 ```python
 from cinema import Cinema
 
-with Cinema.Odeon(site_id="ODEON_SITE_ID") as odeon:
-    films = odeon.films()
+with Cinema.Odeon() as api:
+    cinema = api.search("your city")
+    film = cinema.film("film title")
+    showing = film.time("8pm", "tomorrow")
+    seats = showing.best_seats(2)
 
-with Cinema.Vue() as vue:
-    films = vue.films("VUE_CINEMA_ID")
+    print(cinema, film, showing)
+    print([seat.label for seat in seats])
 ```
 
-Both clients expose `cinemas()`, `films()`, `dates()`, `showtimes()`, `seats()`,
-`tickets()`, `create_order()`, and `cancel_order()`; provider-specific arguments
-reflect each underlying API.
+The same object flow works with `Cinema.Vue()`. Searches accept exact IDs,
+names, partial names and fuzzy matches. Ambiguous searches raise
+`AmbiguousMatch` instead of prompting or guessing.
 
-## Full flow
+## Models and booking
 
-The demo progressively shows cinemas, films, dates, showtimes, prices, and seats:
+High-level calls return `CinemaLocation`, `Film`, `Showtime`, `Seat`,
+`TicketType` and `Booking` objects. Every object retains its provider payload in
+`.raw` and supports `.to_dict()`.
+
+```python
+booking = showing.book(seats=["A1", "A2"], ticket="adult")
+print(booking.order_id)
+booking.cancel()
+```
+
+Vue requires `email=` when creating an order. Creating an order can temporarily
+hold real seats. The SDK refreshes seats before booking and cleans up an ODEON
+order if setup fails; it does not cancel a successfully returned booking.
+
+## Raw API
+
+Existing low-level methods remain available:
+
+```python
+api.cinemas()
+api.films("CINEMA_ID")
+api.dates("FILM_ID", "CINEMA_ID")
+api.request("GET", "provider/path")
+```
+
+Clients expose `.session`, `.provider`, `.capabilities`, configurable timeouts,
+session caching for stable listings, `clear_cache()`, and conservative retries
+for transient GET failures. Caller-supplied sessions are never closed by the SDK.
+
+## Development
 
 ```bash
-python examples/full_flow.py odeon --cinema SITE --film FILM --date YYYY-MM-DD --showtime SHOWTIME --layout LAYOUT
-python examples/full_flow.py vue --cinema CINEMA --film FILM --date YYYY-MM-DD --showtime SESSION
+pip install -e ".[dev]"
+pytest
+ruff check .
 ```
 
-ODEON reservation and guaranteed cleanup:
+The SDK never calls `input()` or logs authentication tokens. Interactive code
+belongs in `examples/`.
 
-```python
-with Cinema.Odeon(site_id="SITE") as api:
-    created = api.create_order()
-    order_id = created.get("order", created)["id"]
-    try:
-        seat_ids = ["SEAT"]
-        api.set_showtime(order_id, "SHOWTIME", seat_ids)
-        tickets = api.make_tickets("TICKET_TYPE", len(seat_ids))
-        api.set_showtime(order_id, "SHOWTIME", seat_ids, tickets)
-    finally:
-        api.cancel_order(order_id)
-```
-
-Vue reservation and guaranteed cleanup:
-
-```python
-with Cinema.Vue() as api:
-    body = api.make_order(
-        "CINEMA", "SESSION", "you@example.com",
-        {"areaCategoryCode": "AREA", "code": "TICKET", "priceInCents": 1299},
-        [{"areaNumber": 1, "rowIndex": 2, "columnIndex": 3}],
-    )
-    created = api.create_order(body)
-    order_id = created["result"]["orderSessionId"]
-    try:
-        print(api.get_order(order_id))
-    finally:
-        api.cancel_order(order_id)
-```
-
-Not affiliated with ODEON or Vue. Their undocumented APIs can change. Creating
-orders temporarily holds real seats—use responsibly and cancel unused orders.
+Not affiliated with ODEON or Vue. Their undocumented APIs can change. Use the
+package responsibly and comply with provider terms.
