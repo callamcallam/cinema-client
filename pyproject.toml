@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cinema-client"
+version = "0.1.0"
+description = "Unofficial Python clients for UK cinema web APIs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Cinema Client Contributors" }]
+dependencies = ["requests>=2.31,<3"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cinema"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
