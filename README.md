@@ -1,12 +1,11 @@
 # cinema-client
 
-One friendly, unofficial Python SDK for ODEON UK and Vue UK.
+Unofficial Python clients for exploring the public web APIs used by ODEON UK
+and Vue UK.
 
 ```bash
 pip install cinema-client
 ```
-
-## 30-second start
 
 ```python
 from cinema import Cinema
@@ -16,62 +15,23 @@ with Cinema.Odeon() as api:
     film = cinema.film("film title")
     showing = film.time("8pm", "tomorrow")
     seats = showing.best_seats(2)
-
-    print(cinema, film, showing)
-    print(showing.advertised_time, showing.film_time)
-    print([seat.label for seat in seats])
 ```
 
-The same object flow works with `Cinema.Vue()`. Searches accept exact IDs,
-names, partial names and fuzzy matches. Ambiguous searches raise
-`AmbiguousMatch` instead of prompting or guessing.
+The same high-level flow works with `Cinema.Vue()`. Low-level methods, raw
+provider payloads, search, showtimes, seats, tickets, temporary orders and order
+cancellation are also available.
 
-## Models and booking
+## Educational use only
 
-High-level calls return `CinemaLocation`, `Film`, `Showtime`, `Seat`,
-`TicketType` and `Booking` objects. Every object retains its provider payload in
-`.raw` and supports `.to_dict()`.
+This project is unofficial, educational software and is not affiliated with or
+endorsed by ODEON or Vue. Use it only where you have permission and in accordance
+with applicable laws and provider terms. Do not disrupt booking availability,
+other customers, accounts or services.
 
-Automatic seat selection excludes wheelchair and companion places unless you
-explicitly pass `accessible=True` to `available_seats()`. Ticket prices use
-`Decimal`; restricted/member/subscription ticket types are excluded from normal
-matching unless explicitly requested.
+The software is provided “as is”, without warranty. Users are responsible for
+their own actions and any consequences arising from use or misuse. Provider APIs
+are undocumented and may change without notice.
 
-```python
-booking = showing.book(seats=["A1", "A2"], ticket="adult")
-print(booking.order_id)
-booking.cancel()
-```
-
-Vue requires `email=` when creating an order. Creating an order can temporarily
-hold real seats. The SDK refreshes seats before booking and cleans up an ODEON
-order if setup fails; it does not cancel a successfully returned booking.
-
-## Raw API
-
-Existing low-level methods remain available:
-
-```python
-api.cinemas()
-api.films("CINEMA_ID")
-api.dates("FILM_ID", "CINEMA_ID")
-api.request("GET", "provider/path")
-```
-
-Clients expose `.session`, `.provider`, `.capabilities`, configurable timeouts,
-session caching for stable listings, `clear_cache()`, and conservative retries
-for transient GET failures. Caller-supplied sessions are never closed by the SDK.
-
-## Development
-
-```bash
-pip install -e ".[dev]"
-pytest
-ruff check .
-```
-
-The SDK never calls `input()` or logs authentication tokens. Interactive code
-belongs in `examples/`.
-
-Not affiliated with ODEON or Vue. Their undocumented APIs can change. Use the
-package responsibly and comply with provider terms.
+Creating an order can temporarily hold real seats. Cancel any order you do not
+intend to complete. Tests and development should use mocks rather than live
+inventory.
