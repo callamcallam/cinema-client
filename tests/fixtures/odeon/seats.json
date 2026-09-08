@@ -1,0 +1,16 @@
+{
+  "seatLayout": {"areas": [{
+    "areaCategoryId": "AREA_ID",
+    "name": "Main area",
+    "rows": [{"label": "A", "seats": [
+      {"id": "SEAT_1", "label": "1", "rowLabel": "A", "type": "Normal", "seatGroupIds": [], "position": {"areaNumber": 1, "rowNumber": 1, "columnNumber": 1}},
+      {"id": "SEAT_2", "label": "2", "rowLabel": "A", "type": "SofaRight", "seatGroupIds": ["SEAT_2", "SEAT_3"], "position": {"areaNumber": 1, "rowNumber": 1, "columnNumber": 2}},
+      {"id": "SEAT_3", "label": "3", "rowLabel": "A", "type": "Wheelchair", "seatGroupIds": [], "position": {"areaNumber": 1, "rowNumber": 1, "columnNumber": 3}}
+    ]}]
+  }]},
+  "availability": {"seatAvailabilities": [
+    {"seatId": "SEAT_1", "status": "Available"},
+    {"seatId": "SEAT_2", "status": "Available"},
+    {"seatId": "SEAT_3", "status": "Available"}
+  ]}
+}

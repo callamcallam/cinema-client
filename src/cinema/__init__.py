@@ -15,8 +15,18 @@ class Cinema:
     Vue = VueClient
 
 
-__all__ = ["Booking", "Cinema", "CinemaLocation", "Film", "OdeonClient", "Seat", "Showtime", "TicketType", "VueClient"]
+__all__ = [
+    "Booking",
+    "Cinema",
+    "CinemaLocation",
+    "Film",
+    "OdeonClient",
+    "Seat",
+    "Showtime",
+    "TicketType",
+    "VueClient",
+]
 try:
     __version__ = version("cinema-client")
 except PackageNotFoundError:
-    __version__ = "0.2.0"
+    __version__ = "0+unknown"

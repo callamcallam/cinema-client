@@ -16,4 +16,3 @@ def decode_response(response: Any, method: str, path: str) -> Any:
     if not response.ok:
         raise CinemaAPIError(method.upper(), path, response.status_code, payload)
     return payload
-

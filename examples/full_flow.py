@@ -19,7 +19,9 @@ def main():
     parser.add_argument("--date")
     parser.add_argument("--showtime")
     parser.add_argument("--layout")
-    parser.add_argument("--book", action="store_true", help="enable the state-changing example")
+    parser.add_argument(
+        "--book", action="store_true", help="enable the state-changing example"
+    )
     args = parser.parse_args()
 
     Client = Cinema.Odeon if args.provider == "odeon" else Cinema.Vue
@@ -32,9 +34,19 @@ def main():
         if not args.film:
             print("\nPass --film to continue to dates.")
             return
-        show("Dates", client.dates(args.film, args.cinema) if args.provider == "odeon" else client.dates(args.cinema, args.film))
+        show(
+            "Dates",
+            client.dates(args.film, args.cinema)
+            if args.provider == "odeon"
+            else client.dates(args.cinema, args.film),
+        )
         if args.date:
-            show("Showtimes", client.showtimes(args.film, args.date, args.cinema) if args.provider == "odeon" else client.showtimes(args.cinema, args.film, args.date))
+            show(
+                "Showtimes",
+                client.showtimes(args.film, args.date, args.cinema)
+                if args.provider == "odeon"
+                else client.showtimes(args.cinema, args.film, args.date),
+            )
         if args.showtime:
             if args.provider == "odeon":
                 show("Tickets", client.tickets(args.showtime))
@@ -48,9 +60,10 @@ def main():
 
         if args.book:
             print("\nOrder creation requires provider-specific ticket and seat IDs.")
-            print("See README.md for the complete create -> reserve -> cancel snippets.")
+            print(
+                "See README.md for the complete create -> reserve -> cancel snippets."
+            )
 
 
 if __name__ == "__main__":
     main()
-

@@ -18,6 +18,7 @@ with Cinema.Odeon() as api:
     seats = showing.best_seats(2)
 
     print(cinema, film, showing)
+    print(showing.advertised_time, showing.film_time)
     print([seat.label for seat in seats])
 ```
 
@@ -30,6 +31,11 @@ names, partial names and fuzzy matches. Ambiguous searches raise
 High-level calls return `CinemaLocation`, `Film`, `Showtime`, `Seat`,
 `TicketType` and `Booking` objects. Every object retains its provider payload in
 `.raw` and supports `.to_dict()`.
+
+Automatic seat selection excludes wheelchair and companion places unless you
+explicitly pass `accessible=True` to `available_seats()`. Ticket prices use
+`Decimal`; restricted/member/subscription ticket types are excluded from normal
+matching unless explicitly requested.
 
 ```python
 booking = showing.book(seats=["A1", "A2"], ticket="adult")

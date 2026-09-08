@@ -1,0 +1,6 @@
+{
+  "filmScreeningDates": [
+    {"businessDate": "2030-01-02", "filmScreenings": []},
+    {"businessDate": "2030-01-03", "filmScreenings": []}
+  ]
+}

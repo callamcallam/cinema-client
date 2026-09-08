@@ -1,0 +1,12 @@
+{
+  "showtimes": [{
+    "id": "SHOWTIME_ID",
+    "screenId": "SCREEN_ID",
+    "seatLayoutId": "LAYOUT_ID",
+    "schedule": {
+      "startsAt": "2030-01-02T19:40:00+00:00",
+      "filmStartsAt": "2030-01-02T20:05:00+00:00",
+      "filmEndsAt": "2030-01-02T22:00:00+00:00"
+    }
+  }]
+}
